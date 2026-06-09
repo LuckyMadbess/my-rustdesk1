@@ -49,7 +49,7 @@ jobs:
       
       - name: Install flutter_rust_bridge
         run: |
-          cargo install flutter_rust_bridge_codegen --features uuid
+          cargo install flutter_rust_bridge_codegen
       
       - name: Generate FFI bridge
         run: |
@@ -116,7 +116,7 @@ jobs:
       
       - name: Install flutter_rust_bridge
         run: |
-          cargo install flutter_rust_bridge_codegen --features uuid
+          cargo install flutter_rust_bridge_codegen
       
       - name: Generate FFI bridge
         run: |
@@ -166,7 +166,7 @@ jobs:
       
       - name: Install flutter_rust_bridge
         run: |
-          cargo install flutter_rust_bridge_codegen --features uuid
+          cargo install flutter_rust_bridge_codegen
       
       - name: Generate FFI bridge
         run: |
