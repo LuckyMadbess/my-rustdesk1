@@ -40,13 +40,24 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0'
+          flutter-version: '3.22.4'
           channel: 'stable'
       
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      
+      - name: Install flutter_rust_bridge
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
+      
+      - name: Generate FFI bridge
+        run: |
+          cd flutter
+          flutter pub get
+          flutter_rust_bridge_codegen generate --config ../bridge_generated.yaml
+          cd ..
       
       - name: Build RustDesk with build.py
         run: |
@@ -102,8 +113,19 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0'
+          flutter-version: '3.22.4'
           channel: 'stable'
+      
+      - name: Install flutter_rust_bridge
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
+      
+      - name: Generate FFI bridge
+        run: |
+          cd flutter
+          flutter pub get
+          flutter_rust_bridge_codegen generate --config ../bridge_generated.yaml
+          cd ..
       
       - name: Build RustDesk
         run: |
@@ -142,8 +164,19 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0'
+          flutter-version: '3.22.4'
           channel: 'stable'
+      
+      - name: Install flutter_rust_bridge
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
+      
+      - name: Generate FFI bridge
+        run: |
+          cd flutter
+          flutter pub get
+          flutter_rust_bridge_codegen generate --config ../bridge_generated.yaml
+          cd ..
       
       - name: Build RustDesk
         run: |
