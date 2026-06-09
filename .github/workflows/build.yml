@@ -1,4 +1,4 @@
-name: Build Custom RustDesk Client (Official Method)
+name: Build Custom RustDesk Client
 
 on:
   workflow_dispatch:
@@ -10,9 +10,6 @@ env:
 jobs:
   build-windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: cmd
     steps:
       - name: Checkout RustDesk with submodules
         run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
@@ -29,41 +26,29 @@ jobs:
         run: |
           git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
           C:\vcpkg\bootstrap-vcpkg.bat
-          echo "VCPKG_ROOT=C:\vcpkg" >> %GITHUB_ENV%
+          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
       
-      - name: Install libraries via vcpkg
+      - name: Install libraries via vcpkg (CLASSIC MODE)
         run: |
-          cd C:\vcpkg
-          vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
-      
-      - name: Install Python (required for build.py)
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+          C:\vcpkg\vcpkg install --classic libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
       
       - name: Install Rust targets
         run: |
           rustup target add x86_64-pc-windows-msvc
-          rustup target add aarch64-pc-windows-msvc
       
-      - name: Build RustDesk using official build script
+      - name: Build RustDesk
         run: |
-          python build.py --flutter --portable
+          $env:RUSTFLAGS = "-C target-feature=+crt-static"
+          cargo build --release --target x86_64-pc-windows-msvc
         env:
           VCPKG_ROOT: C:\vcpkg
-          RUSTFLAGS: "-C target-feature=+crt-static"
+          VCPKGRS_DYNAMIC: 0
       
       - name: Upload standalone EXE
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-windows-portable
-          path: target/reload/rustdesk-x86_64-pc-windows-msvc/portable/rustdesk.exe
-      
-      - name: Upload MSI installer (optional)
-        uses: actions/upload-artifact@v4
-        with:
-          name: rustdesk-windows-installer
-          path: target/reload/rustdesk-x86_64-pc-windows-msvc/rustdesk.msi
+          name: rustdesk-windows
+          path: target/x86_64-pc-windows-msvc/release/rustdesk.exe
 
   build-linux:
     runs-on: ubuntu-latest
@@ -92,14 +77,21 @@ jobs:
           ~/vcpkg/bootstrap-vcpkg.sh
           echo "VCPKG_ROOT=~/vcpkg" >> $GITHUB_ENV
       
-      - name: Build via build.py
+      - name: Install libraries via vcpkg (Linux)
         run: |
-          python build.py --portable
+          ~/vcpkg/vcpkg install --classic libvpx libyuv opus aom
+      
+      - name: Build RustDesk
+        run: |
+          export RUSTFLAGS="-C target-feature=+crt-static"
+          cargo build --release
+        env:
+          VCPKG_ROOT: ~/vcpkg
       
       - name: Upload Linux binary
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-linux-portable
+          name: rustdesk-linux
           path: target/release/rustdesk
 
   build-macos:
@@ -118,12 +110,24 @@ jobs:
         run: |
           brew install cmake nasm ninja llvm
       
-      - name: Build via build.py
+      - name: Setup vcpkg
         run: |
-          python build.py --portable
+          git clone https://github.com/Microsoft/vcpkg.git ~/vcpkg
+          ~/vcpkg/bootstrap-vcpkg.sh
+          echo "VCPKG_ROOT=~/vcpkg" >> $GITHUB_ENV
+      
+      - name: Install libraries via vcpkg (macOS)
+        run: |
+          ~/vcpkg/vcpkg install --classic libvpx libyuv opus aom
+      
+      - name: Build RustDesk
+        run: |
+          cargo build --release
+        env:
+          VCPKG_ROOT: ~/vcpkg
       
       - name: Upload macOS binary
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-macos-portable
+          name: rustdesk-macos
           path: target/release/rustdesk
