@@ -15,7 +15,9 @@ jobs:
         shell: cmd
     steps:
       - name: Checkout RustDesk with submodules
-        run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
+        run: |
+          git clone --recursive https://github.com/rustdesk/rustdesk.git .
+          git submodule update --init --recursive
       
       - name: Patch config.rs (server + key)
         shell: pwsh
@@ -31,10 +33,9 @@ jobs:
           C:\vcpkg\bootstrap-vcpkg.bat
           echo "VCPKG_ROOT=C:\vcpkg" >> %GITHUB_ENV%
       
-      - name: Install FFmpeg and other libraries via vcpkg
+      - name: Install libraries via vcpkg
         run: |
           cd C:\vcpkg
-          vcpkg install --classic ffmpeg:x64-windows-static
           vcpkg install --classic libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
       
       - name: Setup Flutter
@@ -47,23 +48,23 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: Install flutter_rust_bridge
+      - name: Install Rust dependencies
         run: |
           cargo install flutter_rust_bridge_codegen
+          rustup target add x86_64-pc-windows-msvc
       
-      - name: Generate FFI bridge
+      - name: Setup Flutter dependencies
         run: |
           cd flutter
           flutter pub get
-          flutter_rust_bridge_codegen generate --config ../bridge_generated.yaml
+          flutter pub run flutter_rust_bridge:generate
           cd ..
       
-      - name: Build RustDesk with build.py
+      - name: Build RustDesk
         run: |
           python build.py --flutter --portable
         env:
           VCPKG_ROOT: C:\vcpkg
-          RUSTFLAGS: "-C target-feature=+crt-static"
       
       - name: Upload Portable EXE
         uses: actions/upload-artifact@v4
@@ -81,7 +82,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout RustDesk with submodules
-        run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
+        run: |
+          git clone --recursive https://github.com/rustdesk/rustdesk.git .
+          git submodule update --init --recursive
       
       - name: Patch config.rs
         run: |
@@ -96,40 +99,27 @@ jobs:
             libxcb-randr0-dev libxdo-dev libxfixes-dev \
             libxcb-shape0-dev libxcb-xfixes0-dev \
             libasound2-dev libpulse-dev libclang-dev \
-            libva-dev libgtk-3-dev libglib2.0-dev ninja-build \
-            libavcodec-dev libavformat-dev libavutil-dev
-      
-      - name: Setup vcpkg
-        run: |
-          git clone https://github.com/Microsoft/vcpkg.git ~/vcpkg
-          ~/vcpkg/bootstrap-vcpkg.sh
-          echo "VCPKG_ROOT=~/vcpkg" >> $GITHUB_ENV
-      
-      - name: Install FFmpeg via vcpkg (Linux)
-        run: |
-          ~/vcpkg/vcpkg install --classic ffmpeg
+            libva-dev libgtk-3-dev libglib2.0-dev ninja-build
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
       
-      - name: Install flutter_rust_bridge
+      - name: Install Rust dependencies
         run: |
           cargo install flutter_rust_bridge_codegen
       
-      - name: Generate FFI bridge
+      - name: Setup Flutter dependencies
         run: |
           cd flutter
           flutter pub get
-          flutter_rust_bridge_codegen generate --config ../bridge_generated.yaml
+          flutter pub run flutter_rust_bridge:generate
           cd ..
       
       - name: Build RustDesk
         run: |
           python build.py --portable
-        env:
-          VCPKG_ROOT: ~/vcpkg
       
       - name: Upload Linux binary
         uses: actions/upload-artifact@v4
@@ -141,7 +131,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout RustDesk with submodules
-        run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
+        run: |
+          git clone --recursive https://github.com/rustdesk/rustdesk.git .
+          git submodule update --init --recursive
       
       - name: Patch config.rs
         run: |
@@ -151,35 +143,27 @@ jobs:
       
       - name: Install dependencies
         run: |
-          brew install cmake nasm ninja ffmpeg
-      
-      - name: Setup vcpkg
-        run: |
-          git clone https://github.com/Microsoft/vcpkg.git ~/vcpkg
-          ~/vcpkg/bootstrap-vcpkg.sh
-          echo "VCPKG_ROOT=~/vcpkg" >> $GITHUB_ENV
+          brew install cmake nasm ninja
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
       
-      - name: Install flutter_rust_bridge
+      - name: Install Rust dependencies
         run: |
           cargo install flutter_rust_bridge_codegen
       
-      - name: Generate FFI bridge
+      - name: Setup Flutter dependencies
         run: |
           cd flutter
           flutter pub get
-          flutter_rust_bridge_codegen generate --config ../bridge_generated.yaml
+          flutter pub run flutter_rust_bridge:generate
           cd ..
       
       - name: Build RustDesk
         run: |
           python build.py --portable
-        env:
-          VCPKG_ROOT: ~/vcpkg
       
       - name: Upload macOS binary
         uses: actions/upload-artifact@v4
