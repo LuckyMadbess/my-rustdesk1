@@ -10,111 +10,149 @@ env:
 jobs:
   build-windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
     steps:
-      - name: Checkout RustDesk
+      - name: Checkout RustDesk with submodules
         run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
       
-      - name: Patch config.rs
+      - name: Patch config.rs (server + key)
         shell: pwsh
         run: |
           $file = "libs/hbb_common/src/config.rs"
           (Get-Content $file) -replace 'const RENDEZVOUS_SERVER: &str = ".*";', 'const RENDEZVOUS_SERVER: &str = "$env:RENDEZVOUS_SERVER";' | Set-Content $file
           (Get-Content $file) -replace 'const DEFAULT_KEY: &str = ".*";', 'const DEFAULT_KEY: &str = "$env:CUSTOM_KEY";' | Set-Content $file
-          Write-Host "Patched: $env:RENDEZVOUS_SERVER"
+          Write-Host "Patched with server: $env:RENDEZVOUS_SERVER"
       
       - name: Setup vcpkg
         run: |
           git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
           C:\vcpkg\bootstrap-vcpkg.bat
-          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+          echo "VCPKG_ROOT=C:\vcpkg" >> %GITHUB_ENV%
       
-      - name: Install vcpkg libs
-        run: C:\vcpkg\vcpkg install --classic libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
+      - name: Install FFmpeg and other libraries via vcpkg
+        run: |
+          cd C:\vcpkg
+          vcpkg install --classic ffmpeg:x64-windows-static
+          vcpkg install --classic libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
       
-      - name: Install Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.29.0'
+          channel: 'stable'
       
-      - name: Install Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
-      - name: Build RustDesk
+      - name: Build RustDesk with build.py
         run: |
-          python build.py --flutter --portable --hwcodec
+          python build.py --flutter --portable
         env:
           VCPKG_ROOT: C:\vcpkg
+          RUSTFLAGS: "-C target-feature=+crt-static"
       
       - name: Upload Portable EXE
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-gui-portable
+          name: rustdesk-portable
           path: target/release/rustdesk.exe
       
       - name: Upload MSI Installer
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-gui-installer
+          name: rustdesk-installer
           path: target/release/rustdesk.msi
 
   build-linux:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout RustDesk
+      - name: Checkout RustDesk with submodules
         run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
       
       - name: Patch config.rs
         run: |
           sed -i 's|const RENDEZVOUS_SERVER: &str = ".*";|const RENDEZVOUS_SERVER: &str = "${{ env.RENDEZVOUS_SERVER }}";|' libs/hbb_common/src/config.rs
           sed -i 's|const DEFAULT_KEY: &str = ".*";|const DEFAULT_KEY: &str = "${{ env.CUSTOM_KEY }}";|' libs/hbb_common/src/config.rs
+          echo "Patched with server: ${{ env.RENDEZVOUS_SERVER }}"
       
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxcb-randr0-dev libxdo-dev libxfixes-dev \
-            libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libpulse-dev \
-            libclang-dev libva-dev libgtk-3-dev ninja-build
+          sudo apt-get install -y \
+            libxcb-randr0-dev libxdo-dev libxfixes-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev \
+            libasound2-dev libpulse-dev libclang-dev \
+            libva-dev libgtk-3-dev libglib2.0-dev ninja-build \
+            libavcodec-dev libavformat-dev libavutil-dev
+      
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git ~/vcpkg
+          ~/vcpkg/bootstrap-vcpkg.sh
+          echo "VCPKG_ROOT=~/vcpkg" >> $GITHUB_ENV
+      
+      - name: Install FFmpeg via vcpkg (Linux)
+        run: |
+          ~/vcpkg/vcpkg install --classic ffmpeg
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.29.0'
+          channel: 'stable'
       
       - name: Build RustDesk
-        run: python build.py --portable
+        run: |
+          python build.py --portable
+        env:
+          VCPKG_ROOT: ~/vcpkg
       
-      - name: Upload binary
+      - name: Upload Linux binary
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-gui-linux
+          name: rustdesk-linux
           path: target/release/rustdesk
 
   build-macos:
     runs-on: macos-latest
     steps:
-      - name: Checkout RustDesk
+      - name: Checkout RustDesk with submodules
         run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
       
       - name: Patch config.rs
         run: |
           sed -i '' 's|const RENDEZVOUS_SERVER: &str = ".*";|const RENDEZVOUS_SERVER: &str = "${{ env.RENDEZVOUS_SERVER }}";|' libs/hbb_common/src/config.rs
           sed -i '' 's|const DEFAULT_KEY: &str = ".*";|const DEFAULT_KEY: &str = "${{ env.CUSTOM_KEY }}";|' libs/hbb_common/src/config.rs
+          echo "Patched with server: ${{ env.RENDEZVOUS_SERVER }}"
       
       - name: Install dependencies
-        run: brew install cmake nasm ninja
+        run: |
+          brew install cmake nasm ninja ffmpeg
+      
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git ~/vcpkg
+          ~/vcpkg/bootstrap-vcpkg.sh
+          echo "VCPKG_ROOT=~/vcpkg" >> $GITHUB_ENV
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.29.0'
+          channel: 'stable'
       
       - name: Build RustDesk
-        run: python build.py --portable
+        run: |
+          python build.py --portable
+        env:
+          VCPKG_ROOT: ~/vcpkg
       
-      - name: Upload binary
+      - name: Upload macOS binary
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-gui-macos
+          name: rustdesk-macos
           path: target/release/rustdesk
