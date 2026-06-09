@@ -13,61 +13,114 @@ jobs:
     steps:
       - name: Checkout RustDesk
         run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
+      
       - name: Patch config.rs
         shell: pwsh
         run: |
           $file = "libs/hbb_common/src/config.rs"
           (Get-Content $file) -replace 'const RENDEZVOUS_SERVER: &str = ".*";', 'const RENDEZVOUS_SERVER: &str = "$env:RENDEZVOUS_SERVER";' | Set-Content $file
           (Get-Content $file) -replace 'const DEFAULT_KEY: &str = ".*";', 'const DEFAULT_KEY: &str = "$env:CUSTOM_KEY";' | Set-Content $file
+          Write-Host "Patched config.rs with server: $env:RENDEZVOUS_SERVER"
+      
       - name: Setup vcpkg
         run: |
           git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
           C:\vcpkg\bootstrap-vcpkg.bat
           echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+          echo "C:\vcpkg\installed\x64-windows-static\bin" >> $env:GITHUB_PATH
+      
       - name: Install libraries
         run: C:\vcpkg\vcpkg install --classic libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
-      - name: Build
-        run: cargo build --release
-      - name: Upload
+      
+      - name: Build with static linking
+        run: |
+          $env:RUSTFLAGS = "-C target-feature=+crt-static -C link-args=-static"
+          cargo build --release --target x86_64-pc-windows-msvc
+        env:
+          VCPKG_ROOT: C:\vcpkg
+          VCPKGRS_DYNAMIC: 0
+      
+      - name: Create standalone executable
+        run: |
+          # Копируем дополнительные DLL если нужны
+          mkdir release_standalone
+          copy target\x86_64-pc-windows-msvc\release\rustdesk.exe release_standalone\
+          # Статическая линковка должна дать один exe файл без зависимостей
+      
+      - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-windows
-          path: target/release/rustdesk.exe
+          name: rustdesk-windows-standalone
+          path: target/x86_64-pc-windows-msvc/release/rustdesk.exe
+      
+      - name: Upload debug info (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-windows-pdb
+          path: target/x86_64-pc-windows-msvc/release/rustdesk.pdb
 
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout RustDesk
         run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
+      
       - name: Patch config.rs
         run: |
           sed -i 's|const RENDEZVOUS_SERVER: &str = ".*";|const RENDEZVOUS_SERVER: &str = "${{ env.RENDEZVOUS_SERVER }}";|' libs/hbb_common/src/config.rs
           sed -i 's|const DEFAULT_KEY: &str = ".*";|const DEFAULT_KEY: &str = "${{ env.CUSTOM_KEY }}";|' libs/hbb_common/src/config.rs
-      - name: Install deps
+          echo "Patched config.rs with server: ${{ env.RENDEZVOUS_SERVER }}"
+      
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxcb-randr0-dev libxdo-dev libxfixes-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libpulse-dev libclang-dev libva-dev
-      - name: Build
-        run: cargo build --release
-      - name: Upload
+          sudo apt-get install -y \
+            libxcb-randr0-dev libxdo-dev libxfixes-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev \
+            libasound2-dev libpulse-dev libclang-dev \
+            libva-dev libgtk-3-dev libglib2.0-dev
+      
+      - name: Build with static linking
+        run: |
+          export RUSTFLAGS="-C target-feature=+crt-static"
+          cargo build --release --target x86_64-unknown-linux-gnu
+      
+      - name: Upload Linux binary
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-linux
-          path: target/release/rustdesk
+          name: rustdesk-linux-standalone
+          path: target/x86_64-unknown-linux-gnu/release/rustdesk
 
   build-macos:
     runs-on: macos-latest
     steps:
       - name: Checkout RustDesk
         run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
+      
       - name: Patch config.rs
         run: |
           sed -i '' 's|const RENDEZVOUS_SERVER: &str = ".*";|const RENDEZVOUS_SERVER: &str = "${{ env.RENDEZVOUS_SERVER }}";|' libs/hbb_common/src/config.rs
           sed -i '' 's|const DEFAULT_KEY: &str = ".*";|const DEFAULT_KEY: &str = "${{ env.CUSTOM_KEY }}";|' libs/hbb_common/src/config.rs
-      - name: Build
-        run: cargo build --release
-      - name: Upload
+          echo "Patched config.rs with server: ${{ env.RENDEZVOUS_SERVER }}"
+      
+      - name: Install dependencies
+        run: |
+          brew install cmake nasm pkg-config llvm
+      
+      - name: Build for macOS
+        run: |
+          cargo build --release --target x86_64-apple-darwin
+      
+      - name: Create DMG (optional)
+        run: |
+          cargo install cargo-bundle
+          cargo bundle --release
+          if [ -d "target/release/bundle/dmg" ]; then
+            ls -la target/release/bundle/dmg/
+          fi
+      
+      - name: Upload macOS binary
         uses: actions/upload-artifact@v4
         with:
-          name: rustdesk-macos
-          path: target/release/rustdesk
+          name: rustdesk-macos-standalone
+          path: target/x86_64-apple-darwin/release/rustdesk
