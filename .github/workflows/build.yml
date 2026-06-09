@@ -40,7 +40,6 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.4'
           channel: 'stable'
       
       - name: Setup Python
@@ -50,7 +49,7 @@ jobs:
       
       - name: Install flutter_rust_bridge
         run: |
-          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
+          cargo install flutter_rust_bridge_codegen --features uuid
       
       - name: Generate FFI bridge
         run: |
@@ -113,12 +112,11 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.4'
           channel: 'stable'
       
       - name: Install flutter_rust_bridge
         run: |
-          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
+          cargo install flutter_rust_bridge_codegen --features uuid
       
       - name: Generate FFI bridge
         run: |
@@ -164,12 +162,11 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.4'
           channel: 'stable'
       
       - name: Install flutter_rust_bridge
         run: |
-          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features uuid
+          cargo install flutter_rust_bridge_codegen --features uuid
       
       - name: Generate FFI bridge
         run: |
