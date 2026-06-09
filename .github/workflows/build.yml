@@ -1,0 +1,73 @@
+name: Build Custom RustDesk Client
+
+on:
+  workflow_dispatch:
+
+env:
+  RENDEZVOUS_SERVER: "rd.itwonline.ru"
+  CUSTOM_KEY: "uIyvAIIqKmt8sZWuKEfkfxGnm9U1iWxOtxcafU32Sko="
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout RustDesk
+        run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
+      - name: Patch config.rs
+        shell: pwsh
+        run: |
+          $file = "libs/hbb_common/src/config.rs"
+          (Get-Content $file) -replace 'const RENDEZVOUS_SERVER: &str = ".*";', 'const RENDEZVOUS_SERVER: &str = "$env:RENDEZVOUS_SERVER";' | Set-Content $file
+          (Get-Content $file) -replace 'const DEFAULT_KEY: &str = ".*";', 'const DEFAULT_KEY: &str = "$env:CUSTOM_KEY";' | Set-Content $file
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+      - name: Install libraries
+        run: C:\vcpkg\vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
+      - name: Build
+        run: cargo build --release
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-windows
+          path: target/release/rustdesk.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout RustDesk
+        run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
+      - name: Patch config.rs
+        run: |
+          sed -i 's|const RENDEZVOUS_SERVER: &str = ".*";|const RENDEZVOUS_SERVER: &str = "${{ env.RENDEZVOUS_SERVER }}";|' libs/hbb_common/src/config.rs
+          sed -i 's|const DEFAULT_KEY: &str = ".*";|const DEFAULT_KEY: &str = "${{ env.CUSTOM_KEY }}";|' libs/hbb_common/src/config.rs
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-randr0-dev libxdo-dev libxfixes-dev libxcb-shape0-dev libxcb-xfixes0-dev libasound2-dev libpulse-dev libclang-dev libva-dev
+      - name: Build
+        run: cargo build --release
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-linux
+          path: target/release/rustdesk
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout RustDesk
+        run: git clone --recursive https://github.com/rustdesk/rustdesk.git .
+      - name: Patch config.rs
+        run: |
+          sed -i '' 's|const RENDEZVOUS_SERVER: &str = ".*";|const RENDEZVOUS_SERVER: &str = "${{ env.RENDEZVOUS_SERVER }}";|' libs/hbb_common/src/config.rs
+          sed -i '' 's|const DEFAULT_KEY: &str = ".*";|const DEFAULT_KEY: &str = "${{ env.CUSTOM_KEY }}";|' libs/hbb_common/src/config.rs
+      - name: Build
+        run: cargo build --release
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-macos
+          path: target/release/rustdesk
